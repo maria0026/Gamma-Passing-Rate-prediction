@@ -59,7 +59,7 @@ def create_df(reference_files, evaluation_files, txt_files):
 
 df=create_df(reference_files, evaluation_files, txt_files)
 print(df)
-df[['ref', 'eval']].to_csv('ref_eval.csv', sep='\t', index=False)
+df[['ref', 'eval', 'txt']].to_csv('ref_eval2.csv', sep='\t', index=False)
 
 '''
 ref_dist = pydicom.dcmread(df.iloc[0,0])
@@ -74,32 +74,6 @@ txt= df.iloc[0,2]
 print("Txt:", txt)
 '''
 
-df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
-
-#resize, then normalization
-def load_and_preprocess_images(file_paths, desired_size):
-    images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
-    
-    for i, file_path in enumerate(file_paths):
-    #for i in range(10):
-        #Load DICOM image
-        dicom_data = pydicom.dcmread(file_path)
-        image = dicom_data.pixel_array
-        #preprocessing
-        #image = resize(image, desired_size)  
-        #normalize
-        #image = image / 255.0  
-        #image = exposure.rescale_intensity(image, in_range=(image.min(), image.max()), out_range=(0, 100))
-        image=image.astype(np.float32) / image.max()
-        images[i,:,:]=image
-        print(i)
-    return images
-
-
-#X_processed = load_and_preprocess_images(df['X'], size)
-#print(X_processed.shape)
-
-
 def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=7, draw=False) :
 
     ref_dist_dcm = pydicom.dcmread(ref)
@@ -107,10 +81,10 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
     intercept_ref=ref_dist_dcm[(0x0028, 0x1052)].value
     slope_ref=ref_dist_dcm[(0x0028, 0x1053)].value
     ref_dist = ref_dist_dcm.pixel_array
-    print("ref_dist shape", ref_dist.shape)
-    size=ref_dist.shape
+    ref_size=ref_dist.shape
+    print("ref_dist shape", ref_size)
 
-    #ref_dist=resize(ref_dist,size)
+    #ref_dist=resize(ref_dist,ref_size)
 
     eval_dist_dcm = pydicom.dcmread(eval)
     intercept_eval=eval_dist_dcm[(0x0028, 0x1052)].value
@@ -119,14 +93,21 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
     #Get the Meterset Exposure value from the first item in the sequence
     meterset_exposure = exposure_sequence[0][(0x3002, 0x0032)].value
     eval_dist=eval_dist_dcm.pixel_array
-    size2=eval_dist.shape
-    print("eval_dist shape", eval_dist.shape)
+    eval_size=eval_dist.shape
+    print("eval_dist shape", eval_size)
 
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
-    ref_dist=(ref_dist*slope_ref+intercept_ref)*(meterset_exposure)
-    eval_dist=(eval_dist*slope_eval+intercept_eval)
+    if meterset_exposure is not None and slope_ref is not None and intercept_ref is not None:
+        ref_dist=(ref_dist*slope_ref+intercept_ref)*(meterset_exposure)
+    else:
+        return 0, 0
+    
+    if slope_eval is not None and intercept_eval is not None:
+        eval_dist=(eval_dist*slope_eval+intercept_eval)
+    else:
+        return 0, 0
     #print(np.max(eval_dist)/np.max(ref_dist))
-    #eval_dist = resize(eval_dist, size)  
+    #eval_dist = resize(eval_dist, ref_size)  
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
 
     with open(txt, 'r') as file:    
@@ -135,26 +116,19 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
         #Iterate through each line
         for line in lines:
             #Check if the line contains "Passed Area Gamma <1.0"
-            if "Passed	Area Gamma < 1.0"  in line:
+            if "Area Gamma < 1.0"  in line:
                 # Split the line by whitespace to extract the value
                 parts = line.split()
-                #Extract the value from the second part (index 1) of the split line
                 #print(parts)
                 gamma_txt = float(parts[5])
                 break
-            elif "Area Gamma"  in line:
-                parts = line.split()
-                #print(parts)
-                gamma_txt = float(parts[5])
-                break
-            
 
 
     #pixel_rescale=0.336*(1024/1190)
-    x_ref=np.linspace(0,400, size[0])
-    y_ref=np.linspace(0,400, size[1])
-    x_eval = np.linspace(0, 400, size2[0]) 
-    y_eval = np.linspace(0, 400, size2[1]) 
+    x_ref=np.linspace(0,400, ref_size[0])
+    y_ref=np.linspace(0,400, ref_size[1])
+    x_eval = np.linspace(0, 400, eval_size[0]) 
+    y_eval = np.linspace(0, 400, eval_size[1]) 
 
     axes_reference = (x_ref,y_ref)
     axes_evaluation = (x_eval,y_eval)
@@ -233,6 +207,55 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
         #plt.savefig('gamma_hist.png', dpi=300)
 
     return pass_ratio, gamma_txt
+
+def calculate_gamma_for_df(df, dose_percent_threshold, distance_mm_threshold, lower_percent_dose_cutoff):
+    pass_ratios = []
+    gamma_txts = []
+
+    for index, row in df.iterrows():
+        ref = row['ref']
+        eval = row['eval']
+        txt = row['txt']
+        print(ref, eval, txt)
+        
+        pass_ratio, gamma_txt = calculate_gamma(ref, eval, txt, dose_percent_threshold=dose_percent_threshold, distance_mm_threshold=distance_mm_threshold, lower_percent_dose_cutoff=lower_percent_dose_cutoff)
+        print("Pass ratio:", pass_ratio, "Gamma txt:", gamma_txt)
+        pass_ratios.append(pass_ratio)
+        gamma_txts.append(gamma_txt)
+
+    # Add the calculated values to the original DataFrame
+    df['pass_ratio'] = pass_ratios
+    df['gamma_txt'] = gamma_txts
+
+    print(df)
+    #export df['pass_ratio', 'gamma_txt'] to csv
+    df[['pass_ratio','gamma_txt']].to_csv('gamma_results.csv', sep='\t', index=False)
+
+#calculate_gamma_for_df(df, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
+
+df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
+
+#resize, then normalization
+def load_and_preprocess_images(file_paths, desired_size):
+    images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
+    
+    for i, file_path in enumerate(file_paths):
+        #Load DICOM image
+        dicom_data = pydicom.dcmread(file_path)
+        image = dicom_data.pixel_array
+        #preprocessing
+        #image = resize(image, desired_size)  
+        #normalize
+        
+        image=image.astype(np.float32) / image.max()
+        images[i,:,:]=image
+        print(i)
+    return images
+
+
+#X_processed = load_and_preprocess_images(df['X'], ref_size)
+#print(X_processed.shape)
+
 '''
 # Define a function to apply to each row of the DataFrame
 def calculate_gamma_for_row(row):
@@ -245,28 +268,21 @@ def calculate_gamma_for_row(row):
 
 # Apply the function to each row of the DataFrame
 df[['pass_ratio', 'gamma_txt']] = df.apply(calculate_gamma_for_row, axis=1, result_type='expand')
+
+eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/4845686-Portal-Dose-GARDLO SROD.-1-plan1.dcm'
+eval_dist_dcm = pydicom.dcmread(eval)
+print(eval_dist_dcm)
+
+intercept_eval=eval_dist_dcm[(0x0028, 0x1052)].value
+slope_eval=eval_dist_dcm[(0x0028, 0x1053)].value
+exposure_sequence = eval_dist_dcm[(0x3002, 0x0030)].value
+#Get the Meterset Exposure value from the first item in the sequence
+meterset_exposure = exposure_sequence[0][(0x3002, 0x0032)].value
 '''
-pass_ratios = []
-gamma_txts = []
 
-for index, row in df.iterrows():
-    ref = row['ref']
-    eval = row['eval']
-    txt = row['txt']
-    print(ref, eval, txt)
-    
-    pass_ratio, gamma_txt = calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
-    print("Pass ratio:", pass_ratio, "Gamma txt:", gamma_txt)
-    pass_ratios.append(pass_ratio)
-    gamma_txts.append(gamma_txt)
 
-# Add the calculated values to the original DataFrame
-df['pass_ratio'] = pass_ratios
-df['gamma_txt'] = gamma_txts
 
-print(df)
-#export df['pass_ratio', 'gamma_txt'] to csv
-df[['pass_ratio','gamma_txt']].to_csv('gamma_results.csv', sep='\t', index=False)
+#sieć- obrazek liczba
 
 '''
 ref1='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/18482-Predicted-Dose-MOSTEK-2-plan1.dcm'
