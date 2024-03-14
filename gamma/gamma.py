@@ -74,43 +74,51 @@ txt= df.iloc[0,2]
 print("Txt:", txt)
 '''
 
-def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=7, draw=False) :
-
-    ref_dist_dcm = pydicom.dcmread(ref)
+def normalize_image(image, reference=True, evaluation=False):
+    #Load DICOM image
+    dicom_data = pydicom.dcmread(image)
+    intercept = dicom_data[(0x0028, 0x1052)].value
+    slope = dicom_data[(0x0028, 0x1053)].value
+    array_dist = dicom_data.pixel_array
+    size = array_dist.shape
     
-    intercept_ref=ref_dist_dcm[(0x0028, 0x1052)].value
-    slope_ref=ref_dist_dcm[(0x0028, 0x1053)].value
-    ref_dist = ref_dist_dcm.pixel_array
-    ref_size=ref_dist.shape
-    print("ref_dist shape", ref_size)
+    if reference and slope is not None and intercept is not None:
+        array_dist = (array_dist * slope + intercept)
+        return array_dist, slope, intercept, size
+    
+    elif evaluation and slope is not None and intercept is not None:
+        exposure_sequence = dicom_data[(0x3002, 0x0030)].value
+        meterset_exposure = exposure_sequence[0][(0x3002, 0x0032)].value
+        if meterset_exposure is not None:
+            array_dist = (array_dist * slope + intercept) / meterset_exposure
+            return array_dist, slope, intercept, meterset_exposure, size
+        else:
+            return array_dist, slope, intercept, None, size
+    else:
+        return array_dist, None, None, None, size
 
-    #ref_dist=resize(ref_dist,ref_size)
+        #dist = (dist * slope + intercept) / meterset_exposure
 
-    eval_dist_dcm = pydicom.dcmread(eval)
-    intercept_eval=eval_dist_dcm[(0x0028, 0x1052)].value
-    slope_eval=eval_dist_dcm[(0x0028, 0x1053)].value
-    exposure_sequence = eval_dist_dcm[(0x3002, 0x0030)].value
-    #Get the Meterset Exposure value from the first item in the sequence
-    meterset_exposure = exposure_sequence[0][(0x3002, 0x0032)].value
-    eval_dist=eval_dist_dcm.pixel_array
-    eval_size=eval_dist.shape
-    print("eval_dist shape", eval_size)
+
+
+def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=7, draw=False) :
+    
+    ref_dist, slope_ref, intercept_ref, ref_size=normalize_image(ref, reference=True, evaluation=False)
+    eval_dist, slope_eval, intercept_eval, meterset_exposure, eval_size=normalize_image(eval, reference=False, evaluation=True)
 
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
-    if meterset_exposure is not None and slope_ref is not None and intercept_ref is not None:
-        ref_dist=(ref_dist*slope_ref+intercept_ref)*(meterset_exposure)
-    else:
+
+    if meterset_exposure is None or slope_ref is None or intercept_ref is None:
         return 0, 0
     
-    if slope_eval is not None and intercept_eval is not None:
-        eval_dist=(eval_dist*slope_eval+intercept_eval)
-    else:
+    if slope_eval is None or intercept_eval is None:
         return 0, 0
     #print(np.max(eval_dist)/np.max(ref_dist))
     #eval_dist = resize(eval_dist, ref_size)  
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
 
-    with open(txt, 'r') as file:    
+    with open(txt, 'r') as file:   
+         
 
         lines = file.readlines()
         #Iterate through each line
@@ -233,25 +241,32 @@ def calculate_gamma_for_df(df, dose_percent_threshold, distance_mm_threshold, lo
 
 #calculate_gamma_for_df(df, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
 
-df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
+#first attempt- give only reference and gamma passing rate as input
+#read data_for_nn.csv and create a dataframe
+df = pd.read_csv('data_for_nn.csv', sep=',')
+print(df)
+#df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
 
 #resize, then normalization
-def load_and_preprocess_images(file_paths, desired_size):
+def load_and_preprocess_images(file_paths, desired_size, reference=True, evaluation=False):
     images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
     
-    for i, file_path in enumerate(file_paths):
-        #Load DICOM image
-        dicom_data = pydicom.dcmread(file_path)
-        image = dicom_data.pixel_array
-        #preprocessing
-        #image = resize(image, desired_size)  
-        #normalize
-        
-        image=image.astype(np.float32) / image.max()
-        images[i,:,:]=image
-        print(i)
-    return images
+    if reference:
+        for i, file_path in enumerate(file_paths):
+            ref_dist, slope_ref, intercept_ref, ref_size=normalize_image(file_path, reference=True, evaluation=False)
+            #image=image.astype(np.float32) / image.max()
+            images[i,:,:]=ref_dist
+            print(i)
 
+    if evaluation:
+        for i, file_path in enumerate(file_paths):
+            eval_dist, slope_eval, intercept_eval, meterset_exposure, eval_size=normalize_image(file_path, reference=False, evaluation=True)
+            #preprocessing
+            #image = resize(image, desired_size)  
+            images[i,:,:]=eval_dist
+            print(i)
+
+    return images
 
 #X_processed = load_and_preprocess_images(df['X'], ref_size)
 #print(X_processed.shape)
