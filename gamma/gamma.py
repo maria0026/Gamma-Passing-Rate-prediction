@@ -11,6 +11,13 @@ from skimage import exposure
 import time
 
 #print("wersja", tf.__version__)
+
+#there are folders with reference, evaluation distributions and txt files
+#distibution is a dcm with summary of dose received by patient in the treatment plan
+#reference- distribution with predicted dose, filename format: ID-Predicted-Dose-NAME-X-planY.dcm
+#evaluation- distribution with portal dose- measured, filename format: ID-Portal-Dose-NAME-X-planY.dcm
+#txt- text file containing information about Gamma Passing Rate
+
 reference_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference'
 evaluation_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation'
 txt_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt'
@@ -19,7 +26,6 @@ reference_files = os.listdir(reference_folder)
 evaluation_files = os.listdir(evaluation_folder)
 txt_files = os.listdir(txt_folder)
 
-#znajdowanie dcm bez par
 def find_dcm_without_pair(reference_files, evaluation_files):
     files_without_pair = []
     i=0
@@ -35,12 +41,13 @@ def find_dcm_without_pair(reference_files, evaluation_files):
             files_without_pair.append(file)
             i+=1
 
-    print("liczba dcm bez pary", i) #825
+    print("liczba dcm bez pary", i) 
     return files_without_pair
 
 files_without_pair=find_dcm_without_pair(reference_files, evaluation_files)
+#there are some files (825) without a pair, we will not take them into account
 
-#creating dataframe for our model
+#creating dataframe with file paths containing only pairs
 def create_df(reference_files, evaluation_files, txt_files):
     file_pairs = []
     for file in reference_files:
@@ -61,22 +68,12 @@ df=create_df(reference_files, evaluation_files, txt_files)
 print(df)
 df[['ref', 'eval', 'txt']].to_csv('ref_eval2.csv', sep='\t', index=False)
 
-'''
-ref_dist = pydicom.dcmread(df.iloc[0,0])
-ref_dist = ref_dist.pixel_array
-print("Reference shape:", ref_dist.shape)
-
-eval_dist = pydicom.dcmread(df.iloc[0,1])
-eval_dist = eval_dist.pixel_array
-print("Evaluation shape:",eval_dist.shape)
-
-txt= df.iloc[0,2]
-print("Txt:", txt)
-'''
-
 def normalize_image(image, reference=True, evaluation=False):
     #Load DICOM image
     dicom_data = pydicom.dcmread(image)
+    #dicom structure:
+    #(0028, 1052) Rescale Intercept
+    #(0028, 1053) Rescale Slope                
     intercept = dicom_data[(0x0028, 0x1052)].value
     slope = dicom_data[(0x0028, 0x1053)].value
     array_dist = dicom_data.pixel_array
@@ -119,20 +116,17 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
 
     with open(txt, 'r') as file:   
          
-
         lines = file.readlines()
         #Iterate through each line
         for line in lines:
-            #Check if the line contains "Passed Area Gamma <1.0"
+            #Check if the line contains Passed/Failed "Area Gamma < 1.0"
             if "Area Gamma < 1.0"  in line:
-                # Split the line by whitespace to extract the value
+                #Split the line by whitespace to extract the value
                 parts = line.split()
-                #print(parts)
+                #structure in txt file: Passed	Area Gamma < 1.0	99.8 %	95.0 %, we need sixth element to get gamma passing rate
                 gamma_txt = float(parts[5])
                 break
 
-
-    #pixel_rescale=0.336*(1024/1190)
     x_ref=np.linspace(0,400, ref_size[0])
     y_ref=np.linspace(0,400, ref_size[1])
     x_eval = np.linspace(0, 400, eval_size[0]) 
@@ -148,15 +142,15 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
         'dose_percent_threshold': dose_percent_threshold,
         'distance_mm_threshold': distance_mm_threshold,
         'lower_percent_dose_cutoff': lower_percent_dose_cutoff,
-        'interp_fraction': 15,  # Should be 10 or more for more accurate results
+        'interp_fraction': 15,  #Should be 10 or more for more accurate results
         'max_gamma': 1.1,
         'random_subset': None,
         'local_gamma': False,
-        'ram_available': 2**29  # 1/2 GB
+        'ram_available': 2**29  #1/2 GB
     }
     
     start_time = time.time()
-    # Calculate the gamma passing rate
+    #Calculate the gamma passing rate
     gamma = pymedphys.gamma(
         axes_reference,
         dose_reference,
@@ -245,67 +239,111 @@ def calculate_gamma_for_df(df, dose_percent_threshold, distance_mm_threshold, lo
 #read data_for_nn.csv and create a dataframe
 df = pd.read_csv('data_for_nn.csv', sep=',')
 print(df)
-#df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
 
 #resize, then normalization
 def load_and_preprocess_images(file_paths, desired_size, reference=True, evaluation=False):
     images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
     
     if reference:
+
         for i, file_path in enumerate(file_paths):
             ref_dist, slope_ref, intercept_ref, ref_size=normalize_image(file_path, reference=True, evaluation=False)
+            if ref_size==desired_size:
             #image=image.astype(np.float32) / image.max()
-            images[i,:,:]=ref_dist
-            print(i)
+                images[i,:,:]=ref_dist.astype('float16')
+                print(i)
+            else:
+                pass
 
     if evaluation:
         for i, file_path in enumerate(file_paths):
             eval_dist, slope_eval, intercept_eval, meterset_exposure, eval_size=normalize_image(file_path, reference=False, evaluation=True)
             #preprocessing
             #image = resize(image, desired_size)  
-            images[i,:,:]=eval_dist
+            images[i,:,:]=eval_dist.astype('float16')
             print(i)
 
     return images
 
-#X_processed = load_and_preprocess_images(df['X'], ref_size)
-#print(X_processed.shape)
-
-'''
-# Define a function to apply to each row of the DataFrame
-def calculate_gamma_for_row(row):
-    ref = row['ref']
-    eval = row['eval']
-    txt = row['txt']
-    pass_ratio, gamma_txt = calculate_gamma(ref, eval, txt)
-    
-    return pass_ratio, gamma_txt
-
-# Apply the function to each row of the DataFrame
-df[['pass_ratio', 'gamma_txt']] = df.apply(calculate_gamma_for_row, axis=1, result_type='expand')
-
-eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/4845686-Portal-Dose-GARDLO SROD.-1-plan1.dcm'
-eval_dist_dcm = pydicom.dcmread(eval)
-print(eval_dist_dcm)
-
-intercept_eval=eval_dist_dcm[(0x0028, 0x1052)].value
-slope_eval=eval_dist_dcm[(0x0028, 0x1053)].value
-exposure_sequence = eval_dist_dcm[(0x3002, 0x0030)].value
-#Get the Meterset Exposure value from the first item in the sequence
-meterset_exposure = exposure_sequence[0][(0x3002, 0x0032)].value
-'''
+def map_to_class(gamma_value):
+    if gamma_value < 95:
+        return 0
+    elif 95 <= gamma_value < 96:
+        return 1
+    elif 96 <= gamma_value < 96.5:
+        return 2
+    elif 96.5 <= gamma_value < 97:
+        return 3
+    elif 97 <= gamma_value < 98:
+        return 4
+    elif 98 <= gamma_value < 99:
+        return 5
+    elif 99 <= gamma_value < 99.5:
+        return 6
+    elif 99.5 <= gamma_value < 99.8:
+        return 7
+    elif 99.8 <= gamma_value < 99.9:
+        return 8
+    elif 99.9 <= gamma_value <= 100:
+        return 9
+    else:
+        return None
 
 
+df['class'] = df['gamma_txt'].apply(map_to_class)
+print(df['class'])
+df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
+desired_size=(1024,1024)
+X_train = load_and_preprocess_images(df_train['ref'], desired_size)
+Y_train=df_train['class']
+X_test = load_and_preprocess_images(df_test['ref'], desired_size)
+Y_test=df_test['class']
+#print(X_train.shape)
 
 #sieć- obrazek liczba
+model = tf.keras.Sequential([
+    tf.keras.layers.Flatten(input_shape=desired_size),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(10)
+])
 
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+
+model.fit(X_train, Y_train, epochs=10)
+test_loss, test_acc = model.evaluate(X_train,  Y_train, verbose=2)
+
+print('\nTest accuracy:', test_acc)
+
+
+'''
+fashion_mnist = tf.keras.datasets.fashion_mnist
+
+(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+
+class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
+               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+model = tf.keras.Sequential([
+    tf.keras.layers.Flatten(input_shape=(28, 28)),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(10)
+])
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+model.fit(train_images, train_labels, epochs=10)
+test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
+
+print('\nTest accuracy:', test_acc)
+'''
 '''
 ref1='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/18482-Predicted-Dose-MOSTEK-2-plan1.dcm'
 ref2='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/38179-Predicted-Dose-eKRTAN-2-plan1.dcm'
 ref3='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/9246129-Predicted-Dose-eKRTAN-1-plan1.dcm'
 ref4='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/27211-Predicted-Dose-eSKORA-1-plan1.dcm'
 ref5='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/18482-Predicted-Dose-MOSTEK-1-plan1.dcm'
-
+eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/4845686-Portal-Dose-GARDLO SROD.-1-plan1.dcm'
 #98,7
 eval1='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/18482-Portal-Dose-MOSTEK-2-plan1.dcm'
 #99,6
@@ -330,26 +368,4 @@ gamma4, gamma4_txt=calculate_gamma(ref4, eval4, txt4, dose_percent_threshold=2, 
 gamma5, gamma5_txt=calculate_gamma(ref5, eval5, txt5, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
 print("Txt:", gamma1_txt, gamma2_txt, gamma3_txt, gamma4_txt, gamma5_txt)
 print("Gammy: ", gamma1, gamma2, gamma3, gamma4, gamma5)
-'''
-
-'''
-fashion_mnist = tf.keras.datasets.fashion_mnist
-
-(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
-
-class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-
-print(train_images.shape)
-
-plt.figure()
-plt.imshow(train_images[0])
-plt.colorbar()
-plt.grid(False)
-plt.show()
-
-#skalowanie
-train_images = train_images / 255.0
-test_images = test_images / 255.0
-
 '''
