@@ -60,7 +60,9 @@ def create_df(reference_folder, evaluation_folder, txt_folder):
     file_pairs = []
     for file in reference_files:
         pair_name = file.replace("Predicted", "Portal")
+        pair_name = pair_name.replace(",", "")
         txt_name = file.replace("Predicted-Dose-", "").replace(".dcm", ".txt").replace("  ", " ")
+        txt_name = txt_name.replace(",", "")
         if pair_name in evaluation_files and txt_name in txt_files:
             reference_path = os.path.join(reference_folder, file)  #Join with reference_folder
             evaluation_path = os.path.join(evaluation_folder, pair_name)  #Join with evaluation_folder
