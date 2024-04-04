@@ -27,80 +27,6 @@ import normalize
 #evaluation- distribution with portal dose- measured, filename format: ID-Portal-Dose-NAME-X-planY.dcm
 #txt- text file containing information about Gamma Passing Rate
 
-reference_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference'
-evaluation_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation'
-txt_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt'
-
-reference_files = os.listdir(reference_folder)
-evaluation_files = os.listdir(evaluation_folder)
-txt_files = os.listdir(txt_folder)
-
-def find_dcm_without_pair(reference_files, evaluation_files):
-    files_without_pair = []
-    
-    for file in reference_files:
-        pair_name = file.replace("Predicted", "Portal")
-        if pair_name not in evaluation_files:
-            files_without_pair.append(file)
-
-    for file in evaluation_files:
-        pair_name = file.replace("Portal", "Predicted")
-        if pair_name not in reference_files:
-            files_without_pair.append(file)
-
-    return files_without_pair
-
-files_without_pair=find_dcm_without_pair(reference_files, evaluation_files)
-#there are some files (825) without a pair, we will not take them into account
-
-#creating dataframe with file paths containing only pairs
-def create_df(reference_files, evaluation_files, txt_files):
-    file_pairs = []
-    for file in reference_files:
-        pair_name = file.replace("Predicted", "Portal")
-        txt_name = file.replace("Predicted-Dose-", "").replace(".dcm", ".txt").replace("  ", " ")
-        if pair_name in evaluation_files and txt_name in txt_files:
-            reference_path = os.path.join(reference_folder, file)  #Join with reference_folder
-            evaluation_path = os.path.join(evaluation_folder, pair_name)  #Join with evaluation_folder
-            txt_path = os.path.join(txt_folder, txt_name)
-
-            file_pairs.append((reference_path, evaluation_path, txt_path)) 
-
-    df_pairs = pd.DataFrame(file_pairs, columns=['ref', 'eval', 'txt'])
-    df_pairs.to_csv('file_pairs.txt', sep='\t', index=False)
-    return df_pairs
-
-df=create_df(reference_files, evaluation_files, txt_files)
-print(df)
-df[['ref', 'eval', 'txt']].to_csv('ref_eval2.csv', sep='\t', index=False)
-
-'''
-def normalize_image(image, reference=True, evaluation=False):
-    #Load DICOM image
-    dicom_data = pydicom.dcmread(image)
-    #dicom structure:
-    #(0028, 1052) Rescale Intercept
-    #(0028, 1053) Rescale Slope                
-    intercept = dicom_data[(0x0028, 0x1052)].value
-    slope = dicom_data[(0x0028, 0x1053)].value
-    array_dist = dicom_data.pixel_array
-    size = array_dist.shape
-    
-    if reference and slope is not None and intercept is not None:
-        array_dist = (array_dist * slope + intercept)
-        return array_dist, slope, intercept, size
-    
-    elif evaluation and slope is not None and intercept is not None:
-        exposure_sequence = dicom_data[(0x3002, 0x0030)].value
-        meterset_exposure = exposure_sequence[0][(0x3002, 0x0032)].value
-        if meterset_exposure is not None:
-            array_dist = (array_dist * slope + intercept) / meterset_exposure
-            return array_dist, slope, intercept, meterset_exposure, size
-        else:
-            return array_dist, slope, intercept, None, size
-    else:
-        return array_dist, None, None, None, size
-'''
     
 def draw_maps(ref_dist, eval_dist, gamma):
     # Plot reference distribution
@@ -147,8 +73,11 @@ def draw_histogram(valid_gamma, gamma_options, pass_ratio, x_ref, y_ref):
 
 def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=5, draw=False) :
     
-    ref_dist, slope_ref, intercept_ref, ref_size=normalize.normalize_image(ref, reference=True, evaluation=False)
-    eval_dist, slope_eval, intercept_eval, meterset_exposure, eval_size=normalize.normalize_image(eval, reference=False, evaluation=True)
+    ref_dist, ref_size=normalize.normalize_ref_image(ref)
+    eval_dist, eval_size=normalize.normalize_eval_image(eval)
+
+    if ref_dist is None or eval_dist is None:
+        return None, None
     #rezise eval_dist to ref_dist size
     eval_dist = resize(eval_dist, ref_size)
     eval_size=eval_dist.shape
@@ -165,11 +94,6 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
 
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
 
-    if meterset_exposure is None or slope_ref is None or intercept_ref is None:
-        return 0, 0
-    
-    if slope_eval is None or intercept_eval is None:
-        return 0, 0
     #print(np.max(eval_dist)/np.max(ref_dist))
 
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
@@ -256,119 +180,8 @@ def calculate_gamma_for_df(df, dose_percent_threshold, distance_mm_threshold, lo
     #export df['pass_ratio', 'gamma_txt'] to csv
     df[['pass_ratio','gamma_txt']].to_csv('gamma_results5.csv', sep='\t', index=False)
 
-calculate_gamma_for_df(df, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=5, draw=True)
 
-#first attempt- give only reference and gamma passing rate as input
-#read data_for_nn.csv and create a dataframe
-df = pd.read_csv('data_for_nn.csv', sep=',')
-print(df)
 
-#resize, then normalization
-def load_and_preprocess_images(file_paths, desired_size, reference=True, evaluation=False):
-    images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
-    
-    if reference:
-
-        for i, file_path in enumerate(file_paths):
-            ref_dist, slope_ref, intercept_ref, ref_size=normalize.normalize_image(file_path, reference=True, evaluation=False)
-            if ref_size==desired_size:
-            #image=image.astype(np.float32) / image.max()
-                images[i,:,:]=ref_dist.astype('float16')
-                print(i)
-            else:
-                pass
-
-    if evaluation:
-        for i, file_path in enumerate(file_paths):
-            eval_dist, slope_eval, intercept_eval, meterset_exposure, eval_size=normalize.normalize_image(file_path, reference=False, evaluation=True)
-            #preprocessing
-            #image = resize(image, desired_size)  
-            images[i,:,:]=eval_dist.astype('float16')
-            print(i)
-
-    return images
-
-def map_to_class(gamma_value):
-    if gamma_value < 95:
-        return 0
-    elif 95 <= gamma_value < 96:
-        return 1
-    elif 96 <= gamma_value < 96.5:
-        return 2
-    elif 96.5 <= gamma_value < 97:
-        return 3
-    elif 97 <= gamma_value < 98:
-        return 4
-    elif 98 <= gamma_value < 99:
-        return 5
-    elif 99 <= gamma_value < 99.5:
-        return 6
-    elif 99.5 <= gamma_value < 99.8:
-        return 7
-    elif 99.8 <= gamma_value < 99.9:
-        return 8
-    elif 99.9 <= gamma_value <= 100:
-        return 9
-    else:
-        return None
-'''
-df['class'] = df['gamma_txt'].apply(map_to_class)
-print(df['class'])
-
-df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
-
-desired_size=(1024,1024)
-X_train = load_and_preprocess_images(df_train['ref'], desired_size)
-Y_train=df_train['class']
-X_test = load_and_preprocess_images(df_test['ref'], desired_size)
-Y_test=df_test['class']
-
-train_Y_one_hot = to_categorical(Y_train)
-test_Y_one_hot = to_categorical(Y_test)
-train_X,valid_X,train_label,valid_label = train_test_split(X_train, train_Y_one_hot, test_size=0.2, random_state=13)
-
-batch_size = 64
-epochs = 20
-num_classes = 10
-#print(X_train.shape)
-fashion_model = Sequential()
-fashion_model.add(Conv2D(32, kernel_size=(3, 3),activation='linear',input_shape=(1024,1024,1),padding='same'))
-fashion_model.add(LeakyReLU(alpha=0.1))
-fashion_model.add(MaxPooling2D((2, 2),padding='same'))
-fashion_model.add(Conv2D(64, (3, 3), activation='linear',padding='same'))
-fashion_model.add(LeakyReLU(alpha=0.1))
-fashion_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-fashion_model.add(Conv2D(128, (3, 3), activation='linear',padding='same'))
-fashion_model.add(LeakyReLU(alpha=0.1))                  
-fashion_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-fashion_model.add(Flatten())
-fashion_model.add(Dense(128, activation='linear'))
-fashion_model.add(LeakyReLU(alpha=0.1))                  
-fashion_model.add(Dense(num_classes, activation='softmax'))
-fashion_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
-fashion_model.summary()
-fashion_train = fashion_model.fit(X_train, train_Y_one_hot, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
-test_eval = fashion_model.evaluate(X_test, test_Y_one_hot, verbose=0)
-'''
-'''
-#sieć- obrazek liczba
-model = tf.keras.Sequential([
-    tf.keras.layers.Flatten(input_shape=desired_size),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dense(10)
-])
-
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-
-model.fit(X_train, Y_train, epochs=10)
-test_loss, test_acc = model.evaluate(X_train,  Y_train, verbose=2)
-
-print('\nTest accuracy:', test_acc)
-'''
-
-'''
 
 ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/270144-Predicted-Dose-e_MIEDNICA-3-plan4.dcm'
 eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/270144-Portal-Dose-e_MIEDNICA-3-plan4.dcm'
@@ -404,6 +217,7 @@ def shift_image(ref_dist, eval_dist):
 #ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/884040-Predicted-Dose-BLIZNA PW SO-4-plan2.dcm'
 #eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/884040-Portal-Dose-BLIZNA PW SO-4-plan2.dcm'
 #txt='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/884040-BLIZNA PW SO-4-plan2.txt'
+'''
 dicom_data = pydicom.dcmread(ref)
 print(dicom_data)
 pass_ratio, gamma_txt=calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=5, draw=True)
