@@ -11,12 +11,6 @@ from skimage import exposure
 import time
 import cv2
 from skimage.registration import phase_cross_correlation
-import keras
-from keras.models import Sequential,Model
-from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
-from keras.utils import to_categorical
-from keras.layers import LeakyReLU
 import normalize
 
 #print("wersja", tf.__version__)
@@ -79,6 +73,7 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
     if ref_dist is None or eval_dist is None:
         return None, None
     #rezise eval_dist to ref_dist size
+    '''
     eval_dist = resize(eval_dist, ref_size)
     eval_size=eval_dist.shape
     shift = cv2.phaseCorrelate(ref_dist, eval_dist)
@@ -91,7 +86,7 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
     #M= np.float32([[1, 0, shift[0]], [0, 1, shift[1]]])
     eval_dist = cv2.warpAffine(eval_dist, M, (cols, rows))
     print(np.max(ref_dist), np.max(eval_dist))
-
+    '''
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
 
     #print(np.max(eval_dist)/np.max(ref_dist))
@@ -176,101 +171,7 @@ def calculate_gamma_for_df(df, dose_percent_threshold, distance_mm_threshold, lo
     df['pass_ratio'] = pass_ratios
     df['gamma_txt'] = gamma_txts
 
-    print(df)
     #export df['pass_ratio', 'gamma_txt'] to csv
-    df[['pass_ratio','gamma_txt']].to_csv('gamma_results5.csv', sep='\t', index=False)
+    return df
+    
 
-
-
-
-ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/270144-Predicted-Dose-e_MIEDNICA-3-plan4.dcm'
-eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/270144-Portal-Dose-e_MIEDNICA-3-plan4.dcm'
-txt='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/270144-e_MIEDNICA-3-plan4.txt'
-
-ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/4160526-Predicted-Dose-CZERNIAK-2-plan1.dcm'
-eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/4160526-Portal-Dose-CZERNIAK-2-plan1.dcm'
-txt='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/4160526-CZERNIAK-2-plan1.txt'
-'''
-def shift_image(ref_dist, eval_dist):
-    ref_dist, ref_slope, ref_intercept, ref_size =normalize.normalize_image(ref_dist, reference=True, evaluation=False)
-    eval_dist, eval_slope, eval_intercept, meterset_exposure, eval_size =normalize.normalize_image(eval_dist, reference=False, evaluation=True)
-
-    # Find the shift using phase correlation
-    shift = cv2.phaseCorrelate(ref_dist, eval_dist)
-
-    # Apply the shift to the shifted image
-    rows, cols = eval_dist.shape
-    M = np.float32([[1, 0, shift[0]], [0, 1, shift[1]]])
-    eval_dist_shifted = cv2.warpAffine(eval_dist, M, (cols, rows))
-
-    return ref_dist, eval_dist_shifted
-
-'''
-#ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/8045699-Predicted-Dose-eMIGDALEK-2-plan1.dcm'
-#eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/8045699-Portal-Dose-eMIGDALEK-2-plan1.dcm'
-#txt='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/8045699-eMIGDALEK-2-plan1.txt'
-
-#ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/12524-Predicted-Dose-PIERS LW WW-2-plan1.dcm'
-#eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/12524-Portal-Dose-PIERS LW WW-2-plan1.dcm'
-#txt='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/12524-PIERS LW WW-2-plan1.txt'
-
-#ref='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/884040-Predicted-Dose-BLIZNA PW SO-4-plan2.dcm'
-#eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/884040-Portal-Dose-BLIZNA PW SO-4-plan2.dcm'
-#txt='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/884040-BLIZNA PW SO-4-plan2.txt'
-'''
-dicom_data = pydicom.dcmread(ref)
-print(dicom_data)
-pass_ratio, gamma_txt=calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=5, draw=True)
-print(pass_ratio, gamma_txt)
-
-fashion_mnist = tf.keras.datasets.fashion_mnist
-
-(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
-
-class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-model = tf.keras.Sequential([
-    tf.keras.layers.Flatten(input_shape=(28, 28)),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dense(10)
-])
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-model.fit(train_images, train_labels, epochs=10)
-test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
-
-print('\nTest accuracy:', test_acc)
-'''
-'''
-ref1='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/18482-Predicted-Dose-MOSTEK-2-plan1.dcm'
-ref2='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/38179-Predicted-Dose-eKRTAN-2-plan1.dcm'
-ref3='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/9246129-Predicted-Dose-eKRTAN-1-plan1.dcm'
-ref4='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/27211-Predicted-Dose-eSKORA-1-plan1.dcm'
-ref5='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference/18482-Predicted-Dose-MOSTEK-1-plan1.dcm'
-eval='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/4845686-Portal-Dose-GARDLO SROD.-1-plan1.dcm'
-#98,7
-eval1='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/18482-Portal-Dose-MOSTEK-2-plan1.dcm'
-#99,6
-eval2='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/38179-Portal-Dose-eKRTAN-2-plan1.dcm'
-#99.8
-eval3='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/9246129-Portal-Dose-eKRTAN-1-plan1.dcm'
-#99.9
-eval4='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/27211-Portal-Dose-eSKORA-1-plan1.dcm'
-#100
-eval5='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/evaluation/18482-Portal-Dose-MOSTEK-1-plan1.dcm'
-
-txt1='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/18482-MOSTEK-2-plan1.txt'
-txt2='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/38179-eKRTAN-2-plan1.txt'
-txt3='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/9246129-eKRTAN-1-plan1.txt'
-txt4='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/27211-eSKORA-1-plan1.txt'
-txt5='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt/18482-MOSTEK-1-plan1.txt'
-
-gamma1, gamma1_txt=calculate_gamma(ref1, eval1, txt1, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
-gamma2, gamma2_txt=calculate_gamma(ref2, eval2, txt2, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
-gamma3, gamma3_txt=calculate_gamma(ref3, eval3, txt3, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
-gamma4, gamma4_txt=calculate_gamma(ref4, eval4, txt4, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
-gamma5, gamma5_txt=calculate_gamma(ref5, eval5, txt5, dose_percent_threshold=2, distance_mm_threshold=2, lower_percent_dose_cutoff=10)
-print("Txt:", gamma1_txt, gamma2_txt, gamma3_txt, gamma4_txt, gamma5_txt)
-print("Gammy: ", gamma1, gamma2, gamma3, gamma4, gamma5)
-'''
