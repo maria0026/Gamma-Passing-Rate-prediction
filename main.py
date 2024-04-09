@@ -4,6 +4,8 @@ import prepare_df
 import gamma
 import preprocess 
 from sklearn.model_selection import train_test_split
+import model_gamma
+ 
 
 #prepraring df
 data_folder='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/data_final'
@@ -31,14 +33,15 @@ print(df)
 dose_percent_threshold=2
 distance_mm_threshold=2
 lower_percent_dose_cutoff=5
-df=gamma.calculate_gamma_for_df(df, dose_percent_threshold=dose_percent_threshold, distance_mm_threshold=distance_mm_threshold, lower_percent_dose_cutoff=lower_percent_dose_cutoff, draw=False)
-df[['pass_ratio','gamma_txt']].to_csv('gamma_results5.csv', sep='\t', index=False)
+#df=gamma.calculate_gamma_for_df(df, dose_percent_threshold=dose_percent_threshold, distance_mm_threshold=distance_mm_threshold, lower_percent_dose_cutoff=lower_percent_dose_cutoff, draw=False)
+#df[['pass_ratio','gamma_txt']].to_csv('gamma_results5.csv', sep='\t', index=False)
 
 
 #load and preprocess images
-df = pd.read_csv('data_for_nn.csv', sep=',')
+df = pd.read_csv('data_for_nn5.csv', sep=',')
 print(df)
 df = df.dropna()
+df=df[df['pass_ratio']>90]
 print(df)
 df['class'] = df['gamma_txt'].apply(preprocess.map_to_class)
 #print(df['class'])
@@ -47,15 +50,16 @@ df_train, df_test= train_test_split(df, test_size=0.2, random_state=42)
 
 ref_desired_size=(1024,1024)
 eval_desired_size=(1190, 1190)
-#X_train = preprocess.load_and_preprocess_ref_images(df_train['ref'], ref_desired_size)
-#X_train2 = preprocess.load_and_preprocess_eval_images(df_train['eval'], eval_desired_size)
+X_train_ref = preprocess.load_and_preprocess_ref_images(df_train['ref'], ref_desired_size)
+X_test_ref = preprocess.load_and_preprocess_ref_images(df_test['ref'], ref_desired_size)
+#X_train_eval = preprocess.load_and_preprocess_eval_images(df_train['eval'], eval_desired_size)
 
-#Y_train=df_train['class']
-#X_test = preprocess.load_and_preprocess_images(df_test['ref'], ref_desired_size)
-#Y_test=df_test['class']
+Y_train=df_train['class']
+Y_test=df_test['class']
 
 #model
-#print(X_train.shape)
+print(X_train_ref.shape)
 #print(X_train2.shape)
+model_gamma.model1(X_train_ref, Y_train, X_test_ref, Y_test)
 
 
