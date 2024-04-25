@@ -1,81 +1,64 @@
-import keras
-from keras.models import Sequential,Model
-from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
-from keras.utils import to_categorical
-from keras.layers import LeakyReLU
-from sklearn.model_selection import train_test_split
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.nn.functional import softmax as fn_softmax
+from torchvision.models import resnet50, ResNet50_Weights
+import torchvision.transforms as transforms
+import torchvision.models as models
+from torch.utils.data import DataLoader, Dataset
+
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.metrics import accuracy_score
+from torchvision.models import resnet18
+import torch.nn as nn
+import torch.nn.functional as F
+import normalize
+
+
+#X_train, Y_train, X_test, Y_test
+
+from torch.utils.data import Dataset
+from PIL import Image
 
 #first nn- give only reference and gamma passing rate as an input; second nn- give reference and evaluation and gamma passing rate as an input
+class CustomModel(nn.Module):
+    def __init__(self):
+        super().__init__()
 
+        self.activation = F.relu
 
-def model1(X_train, Y_train, X_test, Y_test):
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.pool1 = nn.MaxPool2d(2)
 
+        self.conv2 = nn.Conv2d(in_channels=16, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.pool2 = nn.MaxPool2d(2)
 
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(256)
+        self.pool3 = nn.MaxPool2d(2)
 
-    train_Y_one_hot = to_categorical(Y_train)
-    test_Y_one_hot = to_categorical(Y_test)
-    train_X,valid_X,train_label,valid_label = train_test_split(X_train, train_Y_one_hot, test_size=0.2, random_state=13)
+        self.conv4 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1)
+        self.bn4 = nn.BatchNorm2d(512)
+        self.pool4 = nn.MaxPool2d(2)
 
-    batch_size = 16
-    epochs = 20
-    num_classes = 10
-    #print(X_train.shape)
-    fashion_model = Sequential()
-    fashion_model.add(Conv2D(32, kernel_size=(3, 3),activation='linear',input_shape=(1024,1024,1),padding='same'))
-    fashion_model.add(LeakyReLU(alpha=0.1))
-    fashion_model.add(MaxPooling2D((2, 2),padding='same'))
-    fashion_model.add(Conv2D(64, (3, 3), activation='linear',padding='same'))
-    fashion_model.add(LeakyReLU(alpha=0.1))
-    fashion_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-    fashion_model.add(Conv2D(128, (3, 3), activation='linear',padding='same'))
-    fashion_model.add(LeakyReLU(alpha=0.1))                  
-    fashion_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-    fashion_model.add(Flatten())
-    fashion_model.add(Dense(128, activation='linear'))
-    fashion_model.add(LeakyReLU(alpha=0.1))                  
-    fashion_model.add(Dense(num_classes, activation='softmax'))
-    fashion_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
-    fashion_model.summary()
-    fashion_train = fashion_model.fit(X_train, train_Y_one_hot, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
-    test_eval = fashion_model.evaluate(X_test, test_Y_one_hot, verbose=0)
-    print('Test:', test_eval)
-'''
+        self.adaptivepool = nn.AdaptiveAvgPool2d((1,1))
 
-#sieć- obrazek liczba
-model = tf.keras.Sequential([
-    tf.keras.layers.Flatten(input_shape=desired_size),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dense(10)
-])
+        self.linear1 = nn.Linear(512, 50)
 
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-
-model.fit(X_train, Y_train, epochs=10)
-test_loss, test_acc = model.evaluate(X_train,  Y_train, verbose=2)
-
-print('\nTest accuracy:', test_acc)
+    def forward(self, x):
+        x = self.pool1(self.activation(self.bn1(self.conv1(x))))
+        x = self.pool2(self.activation(self.bn2(self.conv2(x))))
+        x = self.pool3(self.activation(self.bn3(self.conv3(x))))
+        x = self.pool4(self.activation(self.bn4(self.conv4(x))))
+        x = self.adaptivepool(x)
+        x = torch.flatten(x, 1) 
+        x = self.linear1(x)
+        return x
 
 
 
-fashion_mnist = tf.keras.datasets.fashion_mnist
 
-(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
-
-class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-model = tf.keras.Sequential([
-    tf.keras.layers.Flatten(input_shape=(28, 28)),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dense(10)
-])
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-model.fit(train_images, train_labels, epochs=10)
-test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
-
-print('\nTest accuracy:', test_acc)
-'''
