@@ -1,4 +1,5 @@
 import pydicom
+import numpy as np
 
 def normalize_ref_image(image):
     #Load DICOM image
@@ -13,6 +14,7 @@ def normalize_ref_image(image):
     
     if slope is not None and intercept is not None:
         array_dist = (array_dist * slope + intercept)
+        #print(np.max(array_dist))
         return array_dist, size
     else:
         return None, None
