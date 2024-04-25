@@ -79,6 +79,8 @@ def loader(path):
     #print(i)
     if size==(1024, 1024):
         return image
+    else:
+        pass
     
 def is_valid_file(x):
     return x.endswith('.dcm')
