@@ -47,7 +47,7 @@ class CustomModel(nn.Module):
 
         self.adaptivepool = nn.AdaptiveAvgPool2d((1,1))
 
-        self.linear1 = nn.Linear(512, 50)
+        self.linear1 = nn.Linear(512, 10)
 
     def forward(self, x):
         x = self.pool1(self.activation(self.bn1(self.conv1(x))))
