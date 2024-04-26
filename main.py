@@ -108,7 +108,7 @@ test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 #train nn 
 #Instantiate the model
 num_classes=10
-model = model_gamma.CustomModel()
+model = model_gamma.CustomModel(num_classes=num_classes)
 #Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
