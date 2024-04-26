@@ -110,7 +110,7 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
     y_ref=np.linspace(0,400, ref_size[1])
     x_eval = np.linspace(0, 400, eval_size[0]) 
     y_eval = np.linspace(0, 400, eval_size[1]) 
-
+    
     axes_reference = (x_ref,y_ref)
     axes_evaluation = (x_eval,y_eval)
 
