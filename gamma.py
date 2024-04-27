@@ -1,5 +1,4 @@
 import pymedphys
-import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -60,7 +59,7 @@ def draw_histogram(valid_gamma, gamma_options, pass_ratio, x_ref, y_ref):
     else:
         gamma_norm_condition = 'Global gamma'
 
-    plt.title(f"Dose cut: {gamma_options['lower_percent_dose_cutoff']}% | {gamma_norm_condition} ({gamma_options['dose_percent_threshold']}%/{gamma_options['distance_mm_threshold']}mm) | Pass Rate(\u03B3<=1): {pass_ratio*100:.2f}% \n ref pts: {len(y_ref)*len(x_ref)} | valid \u03B3 pts: {len(valid_gamma)}")
+    plt.title(f"Dose cut: {gamma_options['lower_percent_dose_cutoff']}% | {gamma_norm_condition} ({gamma_options['dose_percent_threshold']}%/{gamma_options['distance_mm_threshold']}mm) | Pass Rate(\u03B3<=1): {pass_ratio:.2f}% \n ref pts: {len(y_ref)*len(x_ref)} | valid \u03B3 pts: {len(valid_gamma)}")
     plt.show()
     #plt.savefig('gamma_hist.png', dpi=300)
 
