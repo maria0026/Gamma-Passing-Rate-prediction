@@ -7,6 +7,8 @@ from torchvision import transforms
 import random
 import model_gamma
 import normalize
+from skimage.transform import resize
+
 
 
 #Define transformations
@@ -23,12 +25,39 @@ def loader(path):
     #print(i)
     if size==(1024, 1024):
         return image
+    else:
+        image = resize(image, (1024, 1024))
+        return image
+
     
 def is_valid_file(x):
     return x.endswith('.dcm')
 
+def initialize_data(root):
+    #Create ImageFolder instance
 
-def train_nn(train_loader, model, criterion, optimizer, num_epochs):
+    dataset = ImageFolder(root=root,transform=transform,loader=loader, is_valid_file=is_valid_file)
+
+    #Define the size of the training set
+    train_size = int(0.8 * len(dataset))
+
+    #Randomly split indices for training and testing sets
+    indices = list(range(len(dataset)))
+    random.shuffle(indices)
+    train_indices, test_indices = indices[:train_size], indices[train_size:]
+
+    #Create subset datasets and data loaders for training and testing
+    train_dataset = Subset(dataset, train_indices)
+    test_dataset = Subset(dataset, test_indices)
+
+
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
+
+    return train_dataset, test_dataset, train_loader, test_loader
+
+
+def train(train_dataset, train_loader, model, criterion, optimizer, num_epochs):
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
