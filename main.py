@@ -14,6 +14,10 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, Subset
 import pydicom
 import normalize
+from skimage.transform import resize
+import train_nn
+import eval_nn
+import drzewo
 
 
 #prepraring df
@@ -62,85 +66,26 @@ desired_column='ref'
 #preprocess.split_folder(df=df,source_path=source_path, desired_column=desired_column)
 
 #processing dcm files to jpg for all folders
-#preprocess.preprocess_folder(source_path):
+#preprocess.preprocess_folder(source_path)
 
-
-#Define transformations
-transform = transforms.Compose([
-    #transforms.Resize((224, 224)),  # Resize images to a fixed size
-    transforms.ToTensor(),           # Convert images to PyTorch tensors
-])
-def loader(path):
-    i=0
-    image, size= normalize.normalize_ref_image(path)
-    image=image.astype('float32')
-
-    print(image.dtype)
-    #print(i)
-    if size==(1024, 1024):
-        return image
-    else:
-        pass
-    
-def is_valid_file(x):
-    return x.endswith('.dcm')
-
-#Create ImageFolder instance
+#Create data instance
 root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference_nn'
-dataset = ImageFolder(root=root,transform=transform,loader=loader, is_valid_file=is_valid_file)
+train_dataset, test_dataset, train_loader, test_loader=train_nn.initialize_data(root)
 
-#Define the size of the training set
-train_size = int(0.8 * len(dataset))
 
-#Randomly split indices for training and testing sets
-indices = list(range(len(dataset)))
-random.shuffle(indices)
-train_indices, test_indices = indices[:train_size], indices[train_size:]
-
-#Create subset datasets and data loaders for training and testing
-train_dataset = Subset(dataset, train_indices)
-test_dataset = Subset(dataset, test_indices)
-print(train_dataset)
-
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
-
-#train nn 
+#train the model
 #Instantiate the model
 num_classes=10
 model = model_gamma.CustomModel(num_classes=num_classes)
 #Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
+num_epochs=10
+train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs)
 
+#loading weights
+loaded_weights = torch.load('trained_weights.pth')
+model.load_state_dict(loaded_weights)
 
-#Training loop
-num_epochs = 10
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
-    for inputs, labels in train_loader:
-        optimizer.zero_grad()
-        #inputs=inputs.double()
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item() * inputs.size(0)
-    epoch_loss = running_loss / len(train_dataset)
-    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}')
-'''
-#Evaluation
-model.eval()
-correct = 0
-total = 0
-with torch.no_grad():
-    for inputs, labels in test_loader:
-        outputs = model(inputs)
-        _, predicted = torch.max(outputs, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-
-accuracy = correct / total
-print(f'Test Accuracy: {accuracy:.4f}')
-'''
+#ewaluate the model
+eval_nn.eval(test_loader, model)
