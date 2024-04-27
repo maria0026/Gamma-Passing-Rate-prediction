@@ -6,7 +6,7 @@ from torchvision.datasets import ImageFolder
 from torchvision import transforms
 import random
 
-def eval_nn(test_loader, model):
+def eval(test_loader, model):
     model.eval()
     correct = 0
     total = 0
