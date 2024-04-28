@@ -31,16 +31,16 @@ evaluation_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-predictio
 txt_folder = '/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/txt'
 
 #sort data from data folder into reference and evaluation folders
-prepare_df.data_sorting(data_folder, extension, first_keyword, second_keyword)
-files_without_pair=prepare_df.find_dcm_without_pair(reference_folder, evaluation_folder)
-print("Dcm without pair", len(files_without_pair))
+#prepare_df.data_sorting(data_folder, extension, first_keyword, second_keyword)
+#files_without_pair=prepare_df.find_dcm_without_pair(reference_folder, evaluation_folder)
+#print("Dcm without pair", len(files_without_pair))
 #there are some files (825) without a pair, we will not take them into account
 
 #prepare df with reference, evaluation and txt files
-df=prepare_df.create_df(reference_folder, evaluation_folder, txt_folder)
-df[['ref', 'eval', 'txt']].to_csv('dataframes/ref_eval3.csv', sep=';', index=False)
-df=pd.read_csv('dataframes/ref_eval3.csv', sep=';')
-print(df)
+#df=prepare_df.create_df(reference_folder, evaluation_folder, txt_folder)
+#df[['ref', 'eval', 'txt']].to_csv('dataframes/ref_eval3.csv', sep=';', index=False)
+#df=pd.read_csv('dataframes/ref_eval3.csv', sep=';')
+#print(df)
 
 #calculate gamma passing rate for df
 #df = pd.read_csv('ref_eval2.csv', sep=';')
@@ -58,7 +58,7 @@ print(df)
 df = df.dropna()
 df=df[df['pass_ratio']>90]
 print(df)
-df['class'] = df['gamma_txt'].apply(preprocess.map_to_class)
+#df['class'] = df['gamma_txt'].apply(preprocess.map_to_class)
 
 #sorting the classes into different folders
 source_path='data/reference_nn'
@@ -74,7 +74,6 @@ train_dataset, test_dataset, train_loader, test_loader=train_nn.initialize_data(
 
 
 #train the model
-#Instantiate the model
 num_classes=10
 model = model_gamma.CustomModel(num_classes=num_classes)
 #Define loss function and optimizer
@@ -84,7 +83,7 @@ num_epochs=10
 train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs)
 
 #loading weights
-loaded_weights = torch.load('trained_weights.pth')
+loaded_weights = torch.load('trained_weights_2_klasy.pth')
 model.load_state_dict(loaded_weights)
 
 #ewaluate the model
