@@ -17,7 +17,6 @@ import normalize
 from skimage.transform import resize
 import train_nn
 import eval_nn
-import drzewo
 
 
 #prepraring df
@@ -53,11 +52,20 @@ lower_percent_dose_cutoff=5
 
 
 #load and preprocess images
-df = pd.read_csv('dataframes/data_for_nn5_torch.csv', sep=',')
+#df = pd.read_csv('dataframes/data_for_nn5_naprawione.csv', sep=';')
+#df=prepare_df.calculate_size(df)
+#df.to_csv('dataframes/data_for_nn5_final.csv', sep=';', index=False)
+
+df=pd.read_csv('dataframes/data_for_nn5_final.csv', sep=';')
+#df["ref_size_condition"]=df['ref_size']=="(1024, 1024)"
+#df["eval_size_condition"]=df['eval_size']=="(1190, 1190)"
+#df.to_csv('dataframes/data_for_nn5_final.csv', sep=';', index=False)
 print(df)
 df = df.dropna()
 df=df[df['pass_ratio']>90]
 print(df)
+#print((df['ref_size']!="(1024, 1024)").sum())
+
 #df['class'] = df['gamma_txt'].apply(preprocess.map_to_class)
 
 #sorting the classes into different folders
@@ -68,23 +76,54 @@ desired_column='ref'
 #processing dcm files to jpg for all folders
 #preprocess.preprocess_folder(source_path)
 
-#Create data instance
-root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference_nn'
-train_dataset, test_dataset, train_loader, test_loader=train_nn.initialize_data(root)
+#2 classes
+csv_file='dataframes/data_for_nn5_final.csv'
 
+#Create data instance
+
+root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference'
+root='/home/mariaw/gpr/data/reference'
+classes= False
+train_dataset, test_dataset, train_loader, test_loader=preprocess.initialize_data(csv_file, root, classes= classes)
 
 #train the model
-num_classes=10
-model = model_gamma.CustomModel(num_classes=num_classes)
+num_classes=2
+model = model_gamma.CustomModel_2()
 #Define loss function and optimizer
-criterion = nn.CrossEntropyLoss()
+criterion = nn.BCELoss() 
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 num_epochs=10
-train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs)
+
+train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
+
+#evaluate the model
+eval_nn.eval(test_loader, model, num_classes)
 
 #loading weights
 loaded_weights = torch.load('trained_weights_2_klasy.pth')
 model.load_state_dict(loaded_weights)
 
-#ewaluate the model
-eval_nn.eval(test_loader, model)
+#10 classes
+root='/home/mariaw/gpr/data/reference_nn'
+root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference_nn'
+classes=True
+train_dataset, test_dataset, train_loader, test_loader=preprocess.initialize_data(csv_file, root, classes=classes)
+num_classes=10
+model = model_gamma.CustomModel(num_classes=num_classes)
+'''
+#Define loss function and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+num_epochs=10
+
+train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
+
+
+
+#evaluate the model
+eval_nn.eval(test_loader, model, num_classes)
+
+#loading weights
+loaded_weights = torch.load('trained_weights.pth')
+model.load_state_dict(loaded_weights)
+'''
