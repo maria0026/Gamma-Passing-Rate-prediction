@@ -15,10 +15,6 @@ from torchvision.models import resnet18
 import torch.nn as nn
 import torch.nn.functional as F
 import normalize
-
-
-#X_train, Y_train, X_test, Y_test
-
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -35,5 +31,16 @@ class CustomModel(nn.Module):
         return self.resnet(x)
 
 
+class CustomModel_2(nn.Module):
+    def __init__(self):
+        super(CustomModel_2, self).__init__()
+        self.resnet = resnet18()
+        self.resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 1)
 
+    def forward(self, x):
+        x = self.resnet(x)
+        x = torch.sigmoid(x)  # Funkcja sigmoidalna dla wartości pomiędzy 0 a 1
+        return x
 
+    
