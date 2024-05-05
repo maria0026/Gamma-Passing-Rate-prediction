@@ -5,6 +5,12 @@ import os
 import shutil
 import pydicom
 from PIL import Image
+from torchvision.datasets import ImageFolder
+from torchvision import transforms
+import random 
+from skimage.transform import resize
+from torch.utils.data import DataLoader, Dataset, Subset
+import pandas as pd
 
 def map_to_class(gamma_value):
     if gamma_value < 95:
@@ -50,66 +56,140 @@ def split_folder(df,source_path,desired_column):
         else:
             print(f"Source file {file_path} does not exist")
 
-'''
-def preprocess_dicom_to_jpg(dicom_dir, output_dir):
 
-    os.makedirs(output_dir, exist_ok=True)
-    for filename in os.listdir(dicom_dir):
-        if filename.endswith('.dcm'):
-            file_path=os.path.join(dicom_dir, filename)
-            array_dist,size=normalize.normalize_ref_image(file_path)
-            print(array_dist.shape)
-            image = Image.fromarray(array_dist)
-            image = image.convert('L')
-            output_path = os.path.join(output_dir, filename.replace('.dcm', '.jpg'))
-            image.save(output_path)
+#Define transformations
 
-def preprocess_folder(source_path):
-    folders=os.listdir(source_path)
-    #print(folders)
-    for folder in folders:
-        folder=os.path.join(source_path, folder)
-        #print(folder)
-        output_dir=folder+'_jpg'
-        preprocess_dicom_to_jpg(folder, output_dir)
+def transform_gpr(gpr):
+    #Convert gpr to float32 explicitly
+    gpr = np.float32(gpr)
+    print("dziaa")
+    gpr=torch.tensor(gpr, dtype=torch.float32) 
+    #print(type(gpr))
+    return gpr
 
-#resize, then normalization
-def load_and_preprocess_ref_images(file_paths, desired_size):
-    #images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
-    num_images=len(file_paths)
-    images = torch.zeros((num_images, 1, desired_size[0], desired_size[1]), dtype=torch.uint8)
+transform = transforms.Compose([
+    #transforms.Lambda(transform_sample),
+    # Add more transformations if needed
+    transforms.ToTensor(),  
+])
+
+target_transform = transforms.Compose([
+    transforms.Lambda(lambda gpr: transform_gpr(gpr))
+])
+
+
+def loader(path):
+    image, size= normalize.normalize_ref_image(path)
+    image=image.astype('float32')
+
+    print(image.dtype)
+    #print(i)
+    if size==(1024, 1024):
+        return image
+    else:
+        image = resize(image, (1024, 1024))
+        return image
+
     
-    for i, file_path in enumerate(file_paths):
-        ref_dist, ref_size=normalize.normalize_ref_image(file_path)
-        print(np.max(ref_dist))
-        if ref_size==desired_size:
-        #image=image.astype(np.float32) / image.max()
-            #images[i,:,:]=ref_dist.astype('uint8')
-            ref_dist = ref_dist.reshape((1, desired_size[0], desired_size[1]))
-            images[i, :, :, :] = torch.tensor(ref_dist, dtype=torch.uint8)
-            print(i)
-        else:
-            pass
-    return images
+def is_valid_file(x):
+    return x.endswith('.dcm')
 
-def load_and_preprocess_eval_images(file_paths, desired_size):
-    images=np.zeros((len(file_paths), desired_size[0], desired_size[1]), dtype='uint8')
-    
-    for i, file_path in enumerate(file_paths):
-        if isinstance(file_path, str):
-            eval_dist, eval_size=normalize.normalize_eval_image(file_path)
-            #print(np.max(eval_dist))
-            #preprocessing
-            #image = resize(image, desired_size)
-            if eval_size==desired_size:
-                images[i,:,:]=eval_dist.astype('uint8') #? co z tym datatype
-                print(np.max(images[i,:,:]))
-                print(i)
-            else:
-                pass  
-        else: 
-            images[i,:,:]=np.zeros((desired_size[0], desired_size[1]), dtype='float16')
+class CustomDataset(Dataset):
+    def __init__(self, csv_file, root_dir, transform=transform, target_transform=target_transform, loader=loader):
+        """
+        Args:
+            csv_file (string): Path to the csv file with annotations.
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+            loader (callable, optional): Optional function to load an image given its path.
+        """
+        self.landmarks_frame = pd.read_csv(csv_file, sep=';')
+        self.landmarks_frame = self.landmarks_frame.dropna()  # Drop rows with 'None' values
+        self.landmarks_frame = self.landmarks_frame[self.landmarks_frame['pass_ratio'] > 90]  # Filter GPR > 90
+        self.root_dir = root_dir
+        self.transform = transform
+        self.target_transform = target_transform
+        self.loader = loader
 
-    return images
-'''
+    def __len__(self):
+        return len(self.landmarks_frame)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        img_name = self.landmarks_frame.iloc[idx, 0]
+        
+        # Load image
+        image = self.loader(img_name)
+        #print(type(image))
+
+        # Load GPR
+        gpr = self.landmarks_frame.iloc[idx, 2]  # Assuming GPR is in the third column
+        print(gpr)
+        #print(type(gpr))
+
+        #sample = {'image': image, 'gpr': gpr}
+
+        if self.transform:
+            #sample['image'] = self.transform(sample['image'])
+            image=self.transform(image)
+            #print(type(sample['image']))
+
+        if self.target_transform:
+           
+            #sample['gpr']=self.target_transform(sample['gpr'])
+            gpr=self.target_transform(gpr)
+            gpr=gpr/100
+
+
+        
+            #print(type(sample))
+        return image,gpr.float()
+
+def initialize_data(csv_file, root, classes):
+    #Create ImageFolder instance
+    if not classes:
+        dataset = CustomDataset(csv_file=csv_file, root_dir=root, transform=transform, target_transform=target_transform, loader=loader)
+    else:
+        dataset = ImageFolder(root=root,transform=transform,loader=loader, is_valid_file=is_valid_file)
+
+    #Define the size of the training set
+    train_size = int(0.8 * len(dataset))
+
+    #Randomly split indices for training and testing sets
+    indices = list(range(len(dataset)))
+    random.shuffle(indices)
+    train_indices, test_indices = indices[:train_size], indices[train_size:]
+
+    #Create subset datasets and data loaders for training and testing
+    train_dataset = Subset(dataset, train_indices)
+    test_dataset = Subset(dataset, test_indices)
+
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
+
+    return train_dataset, test_dataset, train_loader, test_loader
+
+def initialize_data_classes(root):
+
+    dataset = ImageFolder(root=root,transform=transform,loader=loader, is_valid_file=is_valid_file)
+
+    #Define the size of the training set
+    train_size = int(0.8 * len(dataset))
+
+    #Randomly split indices for training and testing sets
+    indices = list(range(len(dataset)))
+    random.shuffle(indices)
+    train_indices, test_indices = indices[:train_size], indices[train_size:]
+
+    #Create subset datasets and data loaders for training and testing
+    train_dataset = Subset(dataset, train_indices)
+    test_dataset = Subset(dataset, test_indices)
+
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
+
+    return train_dataset, test_dataset, train_loader, test_loader
 
