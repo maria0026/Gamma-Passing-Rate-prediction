@@ -1,5 +1,6 @@
 import pydicom
 import numpy as np
+from skimage.transform import resize
 
 def normalize_ref_image(image):
     #Load DICOM image
@@ -9,7 +10,16 @@ def normalize_ref_image(image):
     #(0028, 1053) Rescale Slope                
     intercept = dicom_data[(0x0028, 0x1052)].value
     slope = dicom_data[(0x0028, 0x1053)].value
-    array_dist = dicom_data.pixel_array
+    array_dist = dicom_data.pixel_array.astype('float64')
+    print(array_dist.shape)
+    #a=np.zeros((1024, 1024))
+    #a[0:1023,:]=array_dist[1:,:]
+    #array_dist=a
+    #array_dist=resize(array_dist, (1100, 1024), anti_aliasing=True)
+    print(type(array_dist))
+    print(array_dist.dtype)
+    #array_dist=resize(array_dist, (1190, 1090), anti_aliasing=True)
+    #array_dist=array_dist[37:37+1024,:]
     size = array_dist.shape
     
     if slope is not None and intercept is not None:
