@@ -2,6 +2,7 @@ import os
 import shutil
 import pandas as pd
 import gamma
+import normalize
 
 #chcemy z folderu data odfiltrować tylko dcm oraz gdy występuje słowo Predicted dać do folderu reference, a Portal do evalutaion
 def data_sorting(data_folder, extension, first_keyword, second_keyword):
@@ -60,10 +61,13 @@ def create_df(reference_folder, evaluation_folder, txt_folder):
     file_pairs = []
     for file in reference_files:
         pair_name = file.replace("Predicted", "Portal")
-        pair_name = pair_name.replace(",", "")
+        
         txt_name = file.replace("Predicted-Dose-", "").replace(".dcm", ".txt").replace("  ", " ")
-        txt_name = txt_name.replace(",", "")
+        #file = file.replace(",", "")
+        #pair_name = pair_name.replace(",", "")
+        #txt_name = txt_name.replace(",", "")
         if pair_name in evaluation_files and txt_name in txt_files:
+            
             reference_path = os.path.join(reference_folder, file)  #Join with reference_folder
             evaluation_path = os.path.join(evaluation_folder, pair_name)  #Join with evaluation_folder
             txt_path = os.path.join(txt_folder, txt_name)
@@ -71,8 +75,30 @@ def create_df(reference_folder, evaluation_folder, txt_folder):
             file_pairs.append((reference_path, evaluation_path, txt_path)) 
 
     df_pairs = pd.DataFrame(file_pairs, columns=['ref', 'eval', 'txt'])
-    #df_pairs.to_csv('file_pairs.txt', sep='\t', index=False)
+    #df_pairs.to_csv('file_pairs2.txt', sep='\t', index=False)
     return df_pairs
+
+def calculate_size(df):
+    reference_sizes = []
+    evaluation_sizes = []
+    for index, row in df.iterrows():
+        ref = row['ref']
+
+        eval = row['eval']
+        #ref=ref.replace("  ", " ")
+        #eval=eval.replace("  ", " ")
+        ref_dist, ref_size=normalize.normalize_ref_image(ref)
+        eval_dist, eval_size=normalize.normalize_ref_image(eval)
+
+        reference_sizes.append(ref_size)
+        evaluation_sizes.append(eval_size)
+
+    # Add the calculated values to the original DataFrame
+    df['ref_size'] = reference_sizes
+    df['eval_size'] = evaluation_sizes
+
+    return df
+
 
 
 
