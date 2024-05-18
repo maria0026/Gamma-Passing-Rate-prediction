@@ -26,19 +26,19 @@ def draw_maps(ref_dist, eval_dist, gamma):
     plt.figure(figsize=(12, 6))
     plt.subplot(1, 3, 1)
     plt.imshow(ref_dist, cmap='viridis')
-    plt.title('Reference Distribution')
+    plt.title('Reference/predicted Distribution')
     plt.colorbar()
 
     # Plot evaluation distribution
     plt.subplot(1, 3, 2)
     plt.imshow(eval_dist, cmap='viridis')
-    plt.title('Evaluation Distribution')
+    plt.title('Evaluation/measured Distribution')
     plt.colorbar()
 
     # Plot gamma distribution
     plt.subplot(1, 3, 3)
     plt.imshow(gamma, cmap='coolwarm', vmin=0, vmax=1)
-    plt.title('Gamma Passing Rate')
+    plt.title('Gamma Distribution')
     plt.colorbar()
     plt.tight_layout()
     plt.show()
