@@ -59,31 +59,28 @@ def split_folder(df,source_path,desired_column):
 
 #Define transformations
 
-def transform_gpr(gpr):
-    #Convert gpr to float32 explicitly
-    gpr = np.float32(gpr)
-    print("dziaa")
-    gpr=torch.tensor(gpr, dtype=torch.float32) 
-    #print(type(gpr))
-    return gpr
-
+#transform for radiation distribution
 transform = transforms.Compose([
     #transforms.Lambda(transform_sample),
     # Add more transformations if needed
     transforms.ToTensor(),  
 ])
 
+#Transsform for GPR value
+def transform_gpr(gpr):
+    #Convert gpr to float32 explicitly
+    gpr = np.float32(gpr)
+    gpr=torch.tensor(gpr, dtype=torch.float32) 
+    return gpr
+
 target_transform = transforms.Compose([
     transforms.Lambda(lambda gpr: transform_gpr(gpr))
 ])
 
-
 def loader(path):
     image, size= normalize.normalize_ref_image(path)
     image=image.astype('float32')
-
-    print(image.dtype)
-    #print(i)
+    print("Image shape: ", image.shape)
     if size==(1024, 1024):
         return image
     else:
@@ -119,35 +116,24 @@ class CustomDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
+        #0 index is reference distribution
         img_name = self.landmarks_frame.iloc[idx, 0]
         
-        # Load image
+        #Load image
         image = self.loader(img_name)
-        #print(type(image))
 
-        # Load GPR
-        gpr = self.landmarks_frame.iloc[idx, 2]  # Assuming GPR is in the third column
-        print(gpr)
-        #print(type(gpr))
-
-        #sample = {'image': image, 'gpr': gpr}
+        #Load GPR from 3rd column
+        gpr = self.landmarks_frame.iloc[idx, 2]
 
         if self.transform:
-            #sample['image'] = self.transform(sample['image'])
             image=self.transform(image)
-            #print(type(sample['image']))
 
         if self.target_transform:
-           
-            #sample['gpr']=self.target_transform(sample['gpr'])
             gpr=self.target_transform(gpr)
             gpr=gpr/100
 
-
-        
-            #print(type(sample))
         return image,gpr.float()
-
+    
 def initialize_data(csv_file, root, classes):
     #Create ImageFolder instance
     if not classes:
@@ -157,39 +143,27 @@ def initialize_data(csv_file, root, classes):
 
     #Define the size of the training set
     train_size = int(0.8 * len(dataset))
+    val_size=int(0.1*len(dataset))
+    test_size=int(0.1*len(dataset))
 
     #Randomly split indices for training and testing sets
     indices = list(range(len(dataset)))
     random.shuffle(indices)
     train_indices, test_indices = indices[:train_size], indices[train_size:]
 
-    #Create subset datasets and data loaders for training and testing
-    train_dataset = Subset(dataset, train_indices)
-    test_dataset = Subset(dataset, test_indices)
-
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
-
-    return train_dataset, test_dataset, train_loader, test_loader
-
-def initialize_data_classes(root):
-
-    dataset = ImageFolder(root=root,transform=transform,loader=loader, is_valid_file=is_valid_file)
-
-    #Define the size of the training set
-    train_size = int(0.8 * len(dataset))
-
-    #Randomly split indices for training and testing sets
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    train_indices, test_indices = indices[:train_size], indices[train_size:]
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:train_size + val_size]
+    test_indices = indices[train_size + val_size:]
 
     #Create subset datasets and data loaders for training and testing
     train_dataset = Subset(dataset, train_indices)
+    val_dataset = Subset(dataset, val_indices)
     test_dataset = Subset(dataset, test_indices)
 
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
-    return train_dataset, test_dataset, train_loader, test_loader
+    return train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader
+
 
