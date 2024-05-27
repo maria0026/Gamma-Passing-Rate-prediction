@@ -17,7 +17,9 @@ import normalize
 from skimage.transform import resize
 import train_nn
 import eval_nn
-
+import valid
+import numpy as np
+import matplotlib.pyplot as plt
 
 #prepraring df
 data_folder='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/data_final'
@@ -67,63 +69,131 @@ print(df)
 #print((df['ref_size']!="(1024, 1024)").sum())
 
 #df['class'] = df['gamma_txt'].apply(preprocess.map_to_class)
-
+df=df.dropna()
+'''
+#remove rows containing False in ref_size_condition
+df=df[df['ref_size_condition']==True]
+df=df[df['eval_size_condition']==True]
+#save df to csv
+df.to_csv('dataframes/data_for_nn5_final_size.csv', sep=';', index=False)
+'''
+#zrobic to sortowanie dla nowego df
+'''
+df=pd.read_csv('dataframes/data_for_nn5_final_size.csv', sep=';')
+df['class'] = df['gamma_txt'].apply(preprocess.map_to_class)
 #sorting the classes into different folders
-source_path='data/reference_nn'
+source_path='data/reference_nn_2'
 desired_column='ref'
-#preprocess.split_folder(df=df,source_path=source_path, desired_column=desired_column)
-
+preprocess.split_folder(df=df,source_path=source_path, desired_column=desired_column)
+'''
 #processing dcm files to jpg for all folders
 #preprocess.preprocess_folder(source_path)
 
-#2 classes
-csv_file='dataframes/data_for_nn5_final.csv'
 
 #Create data instance
-
-root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference'
-root='/home/mariaw/gpr/data/reference'
-classes= False
-train_dataset, test_dataset, train_loader, test_loader=preprocess.initialize_data(csv_file, root, classes= classes)
-
-#train the model
-num_classes=2
-model = model_gamma.CustomModel_2()
-#Define loss function and optimizer
-criterion = nn.BCELoss() 
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-num_epochs=10
-
-train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
-
-#evaluate the model
-eval_nn.eval(test_loader, model, num_classes)
-
-#loading weights
-loaded_weights = torch.load('trained_weights_2_klasy.pth')
-model.load_state_dict(loaded_weights)
-
 #10 classes
-root='/home/mariaw/gpr/data/reference_nn'
+csv_file='dataframes/data_for_nn5_final_size.csv'
 root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference_nn'
+root='/home/mariaw/gpr/data/reference_nn_2'
 classes=True
-train_dataset, test_dataset, train_loader, test_loader=preprocess.initialize_data(csv_file, root, classes=classes)
 num_classes=10
 model = model_gamma.CustomModel(num_classes=num_classes)
-'''
+
 #Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 num_epochs=10
+#cross validation
 
-train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
+number_of_folds=1
+f1_scores=[]
+specificities=[]
+gain=[]
+'''
+for i in range(number_of_folds):
+    train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader=preprocess.initialize_data(csv_file, root, classes=classes)
+    
+    #train the model
+    train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
+
+    #validate the model
+    #val_nn.validate(val_loader, model, num_classes)
+
+    #evaluate the model
+    eval_nn.eval(test_loader, model, num_classes)
+
+    #loading weights
+    #loaded_weights = torch.load('trained_weights.pth')
+    #model.load_state_dict(loaded_weights)
+'''
+
+csv_file='dataframes/probabilities_1.csv'
+df=pd.read_csv(csv_file, sep=',')
+csv_file='dataframes/probabilities_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+classes_cutoff=3
+min_class=7
+max_class=9
+
+#split df 5 times using monte carlo ale calculate threshold for each split
+val_size=0.5
+thresholds=[]
+FPs=[]
+gains=[]
+classes_cutoffs=[2, 3, 4, 5, 6, 7]
+
+#classes_cutoffs=[2,3,4]
+min_class=7
+#max_class=min_class
+max_class=9
+nr_of_splits=20
+
+csv_file='dataframes/probabilities_1_3.csv'
+df=pd.read_csv(csv_file, sep=',')
+#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_2_3.csv'
+df=pd.read_csv(csv_file, sep=',')
+#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_3.csv'
+df=pd.read_csv(csv_file, sep=',')
+#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_4.csv'
+df=pd.read_csv(csv_file, sep=',')
+#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
 
 
+csv_file='dataframes/probabilities_1_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_2_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_3_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_4_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+csv_file='dataframes/probabilities_5_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
+'''
+classes_cutoffs=[1,2,3, 4, 5, 6, 7]
+min_class=7
+#max_class=min_class
+max_class=9
+csv_file='dataframes/probabilities_1.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
 
-#evaluate the model
-eval_nn.eval(test_loader, model, num_classes)
-
-#loading weights
-loaded_weights = torch.load('trained_weights.pth')
-model.load_state_dict(loaded_weights)
+csv_file='dataframes/probabilities_2.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
+csv_file='dataframes/probabilities_3.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
+csv_file='dataframes/probabilities_4.csv'
+df=pd.read_csv(csv_file, sep=',')
+valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
+#w klasycznym podejściu nie jesteśmy w stanie odzielić klas tak aby przy jakimś progu móc uznać że FP=0
 '''
