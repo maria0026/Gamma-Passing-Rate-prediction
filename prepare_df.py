@@ -1,10 +1,9 @@
 import os
 import shutil
 import pandas as pd
-import gamma
 import normalize
 
-#chcemy z folderu data odfiltrować tylko dcm oraz gdy występuje słowo Predicted dać do folderu reference, a Portal do evalutaion
+#We want to filter only dcm from the data folder and put files with the word Predicted in the reference folder and Portal in the evaluation folder
 def data_sorting(data_folder, extension, first_keyword, second_keyword):
 
     all_files = os.listdir(data_folder)
@@ -78,13 +77,14 @@ def create_df(reference_folder, evaluation_folder, txt_folder):
     #df_pairs.to_csv('file_pairs2.txt', sep='\t', index=False)
     return df_pairs
 
+#function for calculation size of distributions
 def calculate_size(df):
     reference_sizes = []
     evaluation_sizes = []
     for index, row in df.iterrows():
         ref = row['ref']
-
         eval = row['eval']
+
         #ref=ref.replace("  ", " ")
         #eval=eval.replace("  ", " ")
         ref_dist, ref_size=normalize.normalize_ref_image(ref)
