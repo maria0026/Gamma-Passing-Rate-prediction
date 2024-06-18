@@ -71,25 +71,8 @@ def calculate_gamma(ref, eval, txt, dose_percent_threshold=2, distance_mm_thresh
 
     if ref_dist is None or eval_dist is None:
         return None, None
-    #rezise eval_dist to ref_dist size
-    '''
-    eval_dist = resize(eval_dist, ref_size)
-    eval_size=eval_dist.shape
-    shift = cv2.phaseCorrelate(ref_dist, eval_dist)
-    #shift= phase_cross_correlation(ref_dist, eval_dist)
-    print(shift)
-    # Apply the shift to the shifted image
-    rows, cols = eval_dist.shape
-    M = np.float32([[1, 0, round(shift[0][0])], [0, 1, round(shift[0][1])]])
-    print(M)
-    #M= np.float32([[1, 0, shift[0]], [0, 1, shift[1]]])
-    eval_dist = cv2.warpAffine(eval_dist, M, (cols, rows))
-    print(np.max(ref_dist), np.max(eval_dist))
-    '''
-    #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
 
     #print(np.max(eval_dist)/np.max(ref_dist))
-
     #print("max ref", np.max(ref_dist), "max eval", np.max(eval_dist))
 
     with open(txt, 'r') as file:   
@@ -166,11 +149,10 @@ def calculate_gamma_for_df(df, dose_percent_threshold, distance_mm_threshold, lo
         pass_ratios.append(pass_ratio)
         gamma_txts.append(gamma_txt)
 
-    # Add the calculated values to the original DataFrame
+    #Add the calculated values to the DataFrame
     df['pass_ratio'] = pass_ratios
     df['gamma_txt'] = gamma_txts
 
-    #export df['pass_ratio', 'gamma_txt'] to csv
     return df
     
 
