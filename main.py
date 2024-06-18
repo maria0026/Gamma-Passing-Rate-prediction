@@ -95,9 +95,28 @@ preprocess.split_folder(df=df,source_path=source_path, desired_column=desired_co
 csv_file='dataframes/data_for_nn5_final_size.csv'
 root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference_nn'
 root='/home/mariaw/gpr/data/reference_nn_2'
+root='/home/marysia/Documents/GitHub/Gamma-Passing-Rate-prediction/data/reference_nn_2'
 classes=True
 num_classes=10
 model = model_gamma.CustomModel(num_classes=num_classes)
+
+classes_count=valid.calculate_number_of_data_in_classes(root)
+print(classes_count)
+#draw data distibution
+# Extracting keys and values from the dictionary
+classes = list(classes_count.keys())
+counts = list(classes_count.values())
+
+# Creating the histogram
+plt.bar(classes, counts, color='skyblue')
+
+# Adding title and labels
+#plt.title('Class Distribution Histogram')
+plt.xlabel('Numer klasy')
+plt.ylabel('Zliczenia')
+
+# Display the histogram
+plt.show()
 
 #Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
@@ -106,9 +125,6 @@ num_epochs=10
 #cross validation
 
 number_of_folds=1
-f1_scores=[]
-specificities=[]
-gain=[]
 '''
 for i in range(number_of_folds):
     train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader=preprocess.initialize_data(csv_file, root, classes=classes)
@@ -127,65 +143,8 @@ for i in range(number_of_folds):
     #model.load_state_dict(loaded_weights)
 '''
 
-csv_file='dataframes/probabilities_1.csv'
-df=pd.read_csv(csv_file, sep=',')
-csv_file='dataframes/probabilities_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-classes_cutoff=3
-min_class=7
-max_class=9
 
-#split df 5 times using monte carlo ale calculate threshold for each split
-val_size=0.5
-thresholds=[]
-FPs=[]
-gains=[]
-classes_cutoffs=[2, 3, 4, 5, 6, 7]
-
-#classes_cutoffs=[2,3,4]
-min_class=7
-#max_class=min_class
-max_class=9
-nr_of_splits=20
-
-csv_file='dataframes/probabilities_1_3.csv'
-df=pd.read_csv(csv_file, sep=',')
-#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_2_3.csv'
-df=pd.read_csv(csv_file, sep=',')
-#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_3.csv'
-df=pd.read_csv(csv_file, sep=',')
-#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_4.csv'
-df=pd.read_csv(csv_file, sep=',')
-#valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-
-
-csv_file='dataframes/probabilities_1_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_2_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_3_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_4_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
-csv_file='dataframes/probabilities_5_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain(df, val_size, classes_cutoffs, min_class, max_class, nr_of_splits)
 '''
-classes_cutoffs=[1,2,3, 4, 5, 6, 7]
-min_class=7
-#max_class=min_class
-max_class=9
-csv_file='dataframes/probabilities_1.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
-
 csv_file='dataframes/probabilities_2.csv'
 df=pd.read_csv(csv_file, sep=',')
 valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
