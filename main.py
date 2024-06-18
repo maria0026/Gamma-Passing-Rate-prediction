@@ -103,56 +103,40 @@ model = model_gamma.CustomModel(num_classes=num_classes)
 classes_count=valid.calculate_number_of_data_in_classes(root)
 print(classes_count)
 #draw data distibution
-# Extracting keys and values from the dictionary
+#Extracting keys and values from the dictionary
 classes = list(classes_count.keys())
 counts = list(classes_count.values())
 
-# Creating the histogram
+#Creating the histogram
 plt.bar(classes, counts, color='skyblue')
 
-# Adding title and labels
+#Adding title and labels
 #plt.title('Class Distribution Histogram')
 plt.xlabel('Numer klasy')
 plt.ylabel('Zliczenia')
 
-# Display the histogram
+#Display the histogram
 plt.show()
 
 #Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 num_epochs=10
-#cross validation
-
-number_of_folds=1
-'''
-for i in range(number_of_folds):
-    train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader=preprocess.initialize_data(csv_file, root, classes=classes)
-    
-    #train the model
-    train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
-
-    #validate the model
-    #val_nn.validate(val_loader, model, num_classes)
-
-    #evaluate the model
-    eval_nn.eval(test_loader, model, num_classes)
-
-    #loading weights
-    #loaded_weights = torch.load('trained_weights.pth')
-    #model.load_state_dict(loaded_weights)
-'''
 
 
-'''
-csv_file='dataframes/probabilities_2.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
-csv_file='dataframes/probabilities_3.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
-csv_file='dataframes/probabilities_4.csv'
-df=pd.read_csv(csv_file, sep=',')
-valid.calculate_threshold_and_find_gain_class(df, val_size, classes_cutoffs, min_class, max_class)
-#w klasycznym podejściu nie jesteśmy w stanie odzielić klas tak aby przy jakimś progu móc uznać że FP=0
-'''
+train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader=preprocess.initialize_data(csv_file, root, classes=classes)
+
+#train the model
+train_nn.train(train_dataset, train_loader, model, criterion, optimizer, num_epochs, classes=classes)
+
+#validate the model
+#val_nn.validate(val_loader, model, num_classes)
+
+#evaluate the model
+eval_nn.eval(test_loader, model, num_classes)
+
+#loading weights
+#loaded_weights = torch.load('trained_weights.pth')
+#model.load_state_dict(loaded_weights)
+
+
